@@ -1,0 +1,20 @@
+(lang dune 2.8)
+(name wasm)
+
+(source (github WebAssembly/spec))
+(license Apache-2.0)
+(authors "Andreas Rossberg")
+(maintainers "rossberg@mpi-sws.org")
+
+; (package
+;  (name cohttp)
+;  (synopsis "An OCaml library for HTTP clients and servers")
+;  (description "A longer description")
+;  (depends
+;   (alcotest :with-test)
+;   (dune (> 1.5))
+;   (foo (and :dev (> 1.5) (< 2.0)))
+;   (uri (>= 1.9.0))
+;   (uri (< 2.0.0))
+;   (fieldslib (> v0.12))
+;   (fieldslib (< v0.13))))

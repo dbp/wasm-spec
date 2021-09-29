@@ -1,0 +1,8 @@
+(rule
+ (target lexer.ml)
+ (deps   lexer.mll)
+ (action (chdir %{workspace_root}
+          (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
+; NOTE(dbp 2021-09-29): We can't use the latter, as there isn't a way (that I can tell) to pass flags to ocamllex.
+; (ocamllex lexer)
+(ocamlyacc parser)
