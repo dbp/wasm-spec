@@ -10,9 +10,9 @@ open Script
 
 let error at msg = raise (Script.Syntax (at, msg))
 
-let parse_error msg =
-  error Source.no_region
-    (if msg = "syntax error" then "unexpected token" else msg)
+(* let parse_error msg = *)
+(*   error Source.no_region *)
+(*     (if msg = "syntax error" then "unexpected token" else msg) *)
 
 
 (* Position handling *)
@@ -27,11 +27,6 @@ let positions_to_region position1 position2 =
   { left = position_to_pos position1;
     right = position_to_pos position2
   }
-
-let at () =
-  positions_to_region (Parsing.symbol_start_pos ()) (Parsing.symbol_end_pos ())
-let ati i =
-  positions_to_region (Parsing.rhs_start_pos i) (Parsing.rhs_end_pos i)
 
 
 (* Literals *)
@@ -173,8 +168,9 @@ let inline_type_explicit (c : context) x ft at =
 %}
 
 %token LPAR RPAR
-%token NAT INT FLOAT STRING VAR
-%token NUM_TYPE FUNCREF EXTERNREF EXTERN MUT
+(* %token NAT INT FLOAT STRING VAR *)
+(* %token NUM_TYPE *)
+%token FUNCREF EXTERNREF EXTERN MUT
 %token UNREACHABLE NOP DROP SELECT
 %token BLOCK END IF THEN ELSE LOOP BR BR_IF BR_TABLE
 %token CALL CALL_INDIRECT RETURN
@@ -182,8 +178,8 @@ let inline_type_explicit (c : context) x ft at =
 %token TABLE_GET TABLE_SET
 %token TABLE_SIZE TABLE_GROW TABLE_FILL TABLE_COPY TABLE_INIT ELEM_DROP
 %token MEMORY_SIZE MEMORY_GROW MEMORY_FILL MEMORY_COPY MEMORY_INIT DATA_DROP
-%token LOAD STORE OFFSET_EQ_NAT ALIGN_EQ_NAT
-%token CONST UNARY BINARY TEST COMPARE CONVERT
+(* %token LOAD STORE OFFSET_EQ_NAT ALIGN_EQ_NAT *)
+(* %token CONST UNARY BINARY TEST COMPARE CONVERT *)
 %token REF_NULL REF_FUNC REF_EXTERN REF_IS_NULL
 %token FUNC START TYPE PARAM RESULT LOCAL GLOBAL
 %token TABLE ELEM MEMORY DATA DECLARE OFFSET ITEM IMPORT EXPORT
@@ -191,7 +187,7 @@ let inline_type_explicit (c : context) x ft at =
 %token SCRIPT REGISTER INVOKE GET
 %token ASSERT_MALFORMED ASSERT_INVALID ASSERT_SOFT_INVALID ASSERT_UNLINKABLE
 %token ASSERT_RETURN ASSERT_TRAP ASSERT_EXHAUSTION
-%token NAN
+(* %token NAN *)
 %token INPUT OUTPUT
 %token EOF
 
@@ -227,7 +223,7 @@ let inline_type_explicit (c : context) x ft at =
 /* Auxiliaries */
 
 name :
-  | STRING { name $1 (at ()) }
+  | STRING { name $1 (positions_to_region $symbolstartpos $endpos) }
 
 string_list :
   | /* empty */ { "" }
@@ -280,8 +276,8 @@ memory_type :
   | limits { MemoryType $1 }
 
 limits :
-  | NAT { {min = nat32 $1 (ati 1); max = None} }
-  | NAT NAT { {min = nat32 $1 (ati 1); max = Some (nat32 $2 (ati 2))} }
+      | NAT { {min = nat32 $1 (positions_to_region ($startpos($1)) ($endpos($1))); max = None} }
+      | NAT NAT { {min = nat32 $1 (positions_to_region ($startpos($1)) ($endpos($1))); max = Some (nat32 $2 (positions_to_region ($startpos($2)) ($endpos($2))))} }
 
 type_use :
   | LPAR TYPE var RPAR { $3 }
@@ -290,13 +286,13 @@ type_use :
 /* Immediates */
 
 num :
-  | NAT { $1 @@ at () }
-  | INT { $1 @@ at () }
-  | FLOAT { $1 @@ at () }
+  | NAT { $1 @@ positions_to_region $symbolstartpos $endpos }
+  | INT { $1 @@ positions_to_region $symbolstartpos $endpos }
+  | FLOAT { $1 @@ positions_to_region $symbolstartpos $endpos }
 
 var :
-  | NAT { let at = at () in fun c lookup -> nat32 $1 at @@ at }
-  | VAR { let at = at () in fun c lookup -> lookup c ($1 @@ at) @@ at }
+  | NAT { let at = positions_to_region $symbolstartpos $endpos in fun c lookup -> nat32 $1 at @@ at }
+  | VAR { let at = positions_to_region $symbolstartpos $endpos in fun c lookup -> lookup c ($1 @@ at) @@ at }
 
 var_list :
   | /* empty */ { fun c lookup -> [] }
@@ -307,7 +303,7 @@ bind_var_opt :
   | bind_var { fun c anon bind -> bind c $1 }  /* Sugar */
 
 bind_var :
-  | VAR { $1 @@ at () }
+  | VAR { $1 @@ positions_to_region $symbolstartpos $endpos }
 
 labeling_opt :
   | /* empty */ %prec LOW
@@ -326,24 +322,24 @@ labeling_end_opt :
 
 offset_opt :
   | /* empty */ { 0l }
-  | OFFSET_EQ_NAT { nat32 $1 (at ()) }
+  | OFFSET_EQ_NAT { nat32 $1 (positions_to_region $symbolstartpos $endpos) }
 
 align_opt :
   | /* empty */ { None }
   | ALIGN_EQ_NAT
-    { let n = nat $1 (at ()) in
+    { let n = nat $1 (positions_to_region $symbolstartpos $endpos) in
       if not (Lib.Int.is_power_of_two n) then
-        error (at ()) "alignment must be a power of two";
+        error (positions_to_region $symbolstartpos $endpos) "alignment must be a power of two";
       Some (Lib.Int.log2 n) }
 
 
 /* Instructions & Expressions */
 
 instr :
-  | plain_instr { let at = at () in fun c -> [$1 c @@ at] }
+  | plain_instr { let at = positions_to_region $symbolstartpos $endpos in fun c -> [$1 c @@ at] }
   | select_instr_instr { fun c -> let e, es = $1 c in e :: es }
   | call_instr_instr { fun c -> let e, es = $1 c in e :: es }
-  | block_instr { let at = at () in fun c -> [$1 c @@ at] }
+  | block_instr { let at = positions_to_region $symbolstartpos $endpos in fun c -> [$1 c @@ at] }
   | expr { $1 } /* Sugar */
 
 plain_instr :
@@ -369,15 +365,15 @@ plain_instr :
   | TABLE_FILL var { fun c -> table_fill ($2 c table) }
   | TABLE_COPY var var { fun c -> table_copy ($2 c table) ($3 c table) }
   | TABLE_INIT var var { fun c -> table_init ($2 c table) ($3 c elem) }
-  | TABLE_GET { let at = at () in fun c -> table_get (0l @@ at) }  /* Sugar */
-  | TABLE_SET { let at = at () in fun c -> table_set (0l @@ at) }  /* Sugar */
-  | TABLE_SIZE { let at = at () in fun c -> table_size (0l @@ at) }  /* Sugar */
-  | TABLE_GROW { let at = at () in fun c -> table_grow (0l @@ at) }  /* Sugar */
-  | TABLE_FILL { let at = at () in fun c -> table_fill (0l @@ at) }  /* Sugar */
+  | TABLE_GET { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_get (0l @@ at) }  /* Sugar */
+  | TABLE_SET { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_set (0l @@ at) }  /* Sugar */
+  | TABLE_SIZE { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_size (0l @@ at) }  /* Sugar */
+  | TABLE_GROW { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_grow (0l @@ at) }  /* Sugar */
+  | TABLE_FILL { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_fill (0l @@ at) }  /* Sugar */
   | TABLE_COPY  /* Sugar */
-    { let at = at () in fun c -> table_copy (0l @@ at) (0l @@ at) }
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_copy (0l @@ at) (0l @@ at) }
   | TABLE_INIT var  /* Sugar */
-    { let at = at () in fun c -> table_init (0l @@ at) ($2 c elem) }
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> table_init (0l @@ at) ($2 c elem) }
   | ELEM_DROP var { fun c -> elem_drop ($2 c elem) }
   | LOAD offset_opt align_opt { fun c -> $1 $3 $2 }
   | STORE offset_opt align_opt { fun c -> $1 $3 $2 }
@@ -400,7 +396,7 @@ plain_instr :
 
 select_instr :
   | SELECT select_instr_results
-    { let at = at () in fun c -> let b, ts = $2 in
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> let b, ts = $2 in
       select (if b then (Some ts) else None) @@ at }
 
 select_instr_results :
@@ -411,7 +407,7 @@ select_instr_results :
 
 select_instr_instr :
   | SELECT select_instr_results_instr
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c -> let b, ts, es = $2 c in
       select (if b then (Some ts) else None) @@ at1, es }
 
@@ -424,19 +420,19 @@ select_instr_results_instr :
 
 call_instr :
   | CALL_INDIRECT var call_instr_type
-    { let at = at () in fun c -> call_indirect ($2 c table) ($3 c) @@ at }
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> call_indirect ($2 c table) ($3 c) @@ at }
   | CALL_INDIRECT call_instr_type  /* Sugar */
-    { let at = at () in fun c -> call_indirect (0l @@ at) ($2 c) @@ at }
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> call_indirect (0l @@ at) ($2 c) @@ at }
 
 call_instr_type :
   | type_use call_instr_params
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c ->
       match $2 c with
       | FuncType ([], []) -> $1 c type_
       | ft -> inline_type_explicit c ($1 c type_) ft at1 }
   | call_instr_params
-    { let at = at () in fun c -> inline_type c ($1 c) at }
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> inline_type c ($1 c) at }
 
 call_instr_params :
   | LPAR PARAM value_type_list RPAR call_instr_params
@@ -453,21 +449,21 @@ call_instr_results :
 
 call_instr_instr :
   | CALL_INDIRECT var call_instr_type_instr
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c -> let x, es = $3 c in call_indirect ($2 c table) x @@ at1, es }
   | CALL_INDIRECT call_instr_type_instr  /* Sugar */
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c -> let x, es = $2 c in call_indirect (0l @@ at1) x @@ at1, es }
 
 call_instr_type_instr :
   | type_use call_instr_params_instr
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c ->
       match $2 c with
       | FuncType ([], []), es -> $1 c type_, es
       | ft, es -> inline_type_explicit c ($1 c type_) ft at1, es }
   | call_instr_params_instr
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> let ft, es = $1 c in inline_type c ft at, es }
 
 call_instr_params_instr :
@@ -497,12 +493,12 @@ block_instr :
 
 block :
   | type_use block_param_body
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c ->
       VarBlockType (inline_type_explicit c ($1 c type_) (fst $2) at1),
       snd $2 c }
   | block_param_body  /* Sugar */
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c ->
       let bt =
         match fst $1 with
@@ -526,7 +522,7 @@ block_result_body :
 
 expr :  /* Sugar */
   | LPAR expr1 RPAR
-    { let at = at () in fun c -> let es, e' = $2 c in es @ [e' @@ at] }
+    { let at = positions_to_region $symbolstartpos $endpos in fun c -> let es, e' = $2 c in es @ [e' @@ at] }
 
 expr1 :  /* Sugar */
   | plain_instr expr_list { fun c -> $2 c, $1 c }
@@ -535,7 +531,7 @@ expr1 :  /* Sugar */
   | CALL_INDIRECT var call_expr_type
     { fun c -> let x, es = $3 c in es, call_indirect ($2 c table) x }
   | CALL_INDIRECT call_expr_type  /* Sugar */
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c -> let x, es = $2 c in es, call_indirect (0l @@ at1) x }
   | BLOCK labeling_opt block
     { fun c -> let c' = $2 c [] in let bt, es = $3 c' in [], block bt es }
@@ -553,13 +549,13 @@ select_expr_results :
 
 call_expr_type :
   | type_use call_expr_params
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c ->
       match $2 c with
       | FuncType ([], []), es -> $1 c type_, es
       | ft, es -> inline_type_explicit c ($1 c type_) ft at1, es }
   | call_expr_params
-    { let at1 = ati 1 in
+    { let at1 = positions_to_region ($startpos($1)) ($endpos($1)) in
       fun c -> let ft, es = $1 c in inline_type c ft at1, es }
 
 call_expr_params :
@@ -578,12 +574,12 @@ call_expr_results :
 
 if_block :
   | type_use if_block_param_body
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c c' ->
       VarBlockType (inline_type_explicit c ($1 c type_) (fst $2) at),
       snd $2 c c' }
   | if_block_param_body  /* Sugar */
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c c' ->
       let bt =
         match fst $1 with
@@ -624,14 +620,14 @@ expr_list :
   | expr expr_list { fun c -> $1 c @ $2 c }
 
 const_expr :
-  | instr_list { let at = at () in fun c -> $1 c @@ at }
+  | instr_list { let at = positions_to_region $symbolstartpos $endpos in fun c -> $1 c @@ at }
 
 
 /* Functions */
 
 func :
   | LPAR FUNC bind_var_opt func_fields RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> let x = $3 c anon_func bind_func @@ at in fun () -> $4 c x at }
 
 func_fields :
@@ -693,7 +689,7 @@ func_result_body :
 func_body :
   | instr_list
     { fun c -> let c' = anon_label c in
-      {ftype = -1l @@ at(); locals = []; body = $1 c'} }
+      {ftype = -1l @@ positions_to_region $symbolstartpos $endpos; locals = []; body = $1 c'} }
   | LPAR LOCAL value_type_list RPAR func_body
     { fun c -> anon_locals c (lazy $3); let f = $5 c in
       {f with locals = $3 @ f.locals} }
@@ -712,14 +708,14 @@ memory_use :
 
 offset :
   | LPAR OFFSET const_expr RPAR { $3 }
-  | expr { let at = at () in fun c -> $1 c @@ at }  /* Sugar */
+  | expr { let at = positions_to_region $symbolstartpos $endpos in fun c -> $1 c @@ at }  /* Sugar */
 
 elem_kind :
   | FUNC { FuncRefType }
 
 elem_expr :
   | LPAR ITEM const_expr RPAR { $3 }
-  | expr { let at = at () in fun c -> $1 c @@ at }  /* Sugar */
+  | expr { let at = positions_to_region $symbolstartpos $endpos in fun c -> $1 c @@ at }  /* Sugar */
 
 elem_expr_list :
   | /* empty */ { fun c -> [] }
@@ -739,29 +735,29 @@ elem_list :
 
 elem :
   | LPAR ELEM bind_var_opt elem_list RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
       { etype = (fst $4); einit = (snd $4) c; emode = Passive @@ at } @@ at }
   | LPAR ELEM bind_var_opt table_use offset elem_list RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
       { etype = (fst $6); einit = (snd $6) c;
         emode = Active {index = $4 c table; offset = $5 c} @@ at } @@ at }
   | LPAR ELEM bind_var_opt DECLARE elem_list RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
       { etype = (fst $5); einit = (snd $5) c; emode = Declarative @@ at } @@ at }
   | LPAR ELEM bind_var_opt offset elem_list RPAR  /* Sugar */
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
       { etype = (fst $5); einit = (snd $5) c;
         emode = Active {index = 0l @@ at; offset = $4 c} @@ at } @@ at }
   | LPAR ELEM bind_var_opt offset elem_var_list RPAR  /* Sugar */
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_elem bind_elem);
       fun () ->
       { etype = FuncRefType; einit = $5 c func;
@@ -769,7 +765,7 @@ elem :
 
 table :
   | LPAR TABLE bind_var_opt table_fields RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> let x = $3 c anon_table bind_table @@ at in
       fun () -> $4 c x at }
 
@@ -805,23 +801,23 @@ table_fields :
 
 data :
   | LPAR DATA bind_var_opt string_list RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () -> {dinit = $4; dmode = Passive @@ at} @@ at }
   | LPAR DATA bind_var_opt memory_use offset string_list RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
       {dinit = $6; dmode = Active {index = $4 c memory; offset = $5 c} @@ at} @@ at }
   | LPAR DATA bind_var_opt offset string_list RPAR  /* Sugar */
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> ignore ($3 c anon_data bind_data);
       fun () ->
       {dinit = $5; dmode = Active {index = 0l @@ at; offset = $4 c} @@ at} @@ at }
 
 memory :
   | LPAR MEMORY bind_var_opt memory_fields RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> let x = $3 c anon_memory bind_memory @@ at in
       fun () -> $4 c x at }
 
@@ -846,7 +842,7 @@ memory_fields :
 
 global :
   | LPAR GLOBAL bind_var_opt global_fields RPAR
-    { let at = at () in
+    { let at = positions_to_region $symbolstartpos $endpos in
       fun c -> let x = $3 c anon_global bind_global @@ at in
       fun () -> $4 c x at }
 
@@ -870,7 +866,7 @@ import_desc :
     { fun c -> ignore ($3 c anon_func bind_func);
       fun () -> FuncImport ($4 c type_) }
   | LPAR FUNC bind_var_opt func_type RPAR  /* Sugar */
-    { let at4 = ati 4 in
+    { let at4 = positions_to_region ($startpos($4)) ($endpos($4)) in
       fun c -> ignore ($3 c anon_func bind_func);
       fun () -> FuncImport (inline_type c $4 at4) }
   | LPAR TABLE bind_var_opt table_type RPAR
@@ -885,7 +881,7 @@ import_desc :
 
 import :
   | LPAR IMPORT name name import_desc RPAR
-    { let at = at () and at5 = ati 5 in
+    { let at = positions_to_region $symbolstartpos $endpos and at5 = positions_to_region ($startpos($5)) ($endpos($5)) in
       fun c -> let df = $5 c in
       fun () -> {module_name = $3; item_name = $4; idesc = df () @@ at5} @@ at }
 
@@ -900,18 +896,18 @@ export_desc :
 
 export :
   | LPAR EXPORT name export_desc RPAR
-    { let at = at () and at4 = ati 4 in
+    { let at = positions_to_region $symbolstartpos $endpos and at4 = positions_to_region ($startpos($4)) ($endpos($4)) in
       fun c -> {name = $3; edesc = $4 c @@ at4} @@ at }
 
 inline_export :
   | LPAR EXPORT name RPAR
-    { let at = at () in fun d c -> {name = $3; edesc = d @@ at} @@ at }
+    { let at = positions_to_region $symbolstartpos $endpos in fun d c -> {name = $3; edesc = d @@ at} @@ at }
 
 
 /* Modules */
 
 type_ :
-  | def_type { $1 @@ at () }
+  | def_type { $1 @@ positions_to_region $symbolstartpos $endpos }
 
 type_def :
   | LPAR TYPE type_ RPAR
@@ -984,82 +980,82 @@ module_fields1 :
 
 module_var_opt :
   | /* empty */ { None }
-  | VAR { Some ($1 @@ at ()) }  /* Sugar */
+  | VAR { Some ($1 @@ positions_to_region $symbolstartpos $endpos) }  /* Sugar */
 
 module_ :
   | LPAR MODULE module_var_opt module_fields RPAR
-    { $3, Textual ($4 (empty_context ()) () @@ at ()) @@ at () }
+    { $3, Textual ($4 (empty_context ()) () @@ positions_to_region $symbolstartpos $endpos) @@ positions_to_region $symbolstartpos $endpos }
 
 inline_module :  /* Sugar */
-  | module_fields { Textual ($1 (empty_context ()) () @@ at ()) @@ at () }
+  | module_fields { Textual ($1 (empty_context ()) () @@ positions_to_region $symbolstartpos $endpos) @@ positions_to_region $symbolstartpos $endpos }
 
 inline_module1 :  /* Sugar */
-  | module_fields1 { Textual ($1 (empty_context ()) () @@ at ()) @@ at () }
+  | module_fields1 { Textual ($1 (empty_context ()) () @@ positions_to_region $symbolstartpos $endpos) @@ positions_to_region $symbolstartpos $endpos }
 
 
 /* Scripts */
 
 script_var_opt :
   | /* empty */ { None }
-  | VAR { Some ($1 @@ at ()) }  /* Sugar */
+  | VAR { Some ($1 @@ positions_to_region $symbolstartpos $endpos) }  /* Sugar */
 
 script_module :
   | module_ { $1 }
   | LPAR MODULE module_var_opt BIN string_list RPAR
-    { $3, Encoded ("binary:" ^ string_of_pos (at()).left, $5) @@ at() }
+    { $3, Encoded ("binary:" ^ string_of_pos (positions_to_region $symbolstartpos $endpos).left, $5) @@ positions_to_region $symbolstartpos $endpos }
   | LPAR MODULE module_var_opt QUOTE string_list RPAR
-    { $3, Quoted ("quote:" ^ string_of_pos (at()).left, $5) @@ at() }
+    { $3, Quoted ("quote:" ^ string_of_pos (positions_to_region $symbolstartpos $endpos).left, $5) @@ positions_to_region $symbolstartpos $endpos }
 
 action :
   | LPAR INVOKE module_var_opt name const_list RPAR
-    { Invoke ($3, $4, $5) @@ at () }
+    { Invoke ($3, $4, $5) @@ positions_to_region $symbolstartpos $endpos }
   | LPAR GET module_var_opt name RPAR
-    { Get ($3, $4) @@ at() }
+    { Get ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
 
 assertion :
   | LPAR ASSERT_MALFORMED script_module STRING RPAR
-    { AssertMalformed (snd $3, $4) @@ at () }
+    { AssertMalformed (snd $3, $4) @@ positions_to_region $symbolstartpos $endpos }
   | LPAR ASSERT_INVALID script_module STRING RPAR
-    { AssertInvalid (snd $3, $4) @@ at () }
+    { AssertInvalid (snd $3, $4) @@ positions_to_region $symbolstartpos $endpos }
   | LPAR ASSERT_UNLINKABLE script_module STRING RPAR
-    { AssertUnlinkable (snd $3, $4) @@ at () }
+    { AssertUnlinkable (snd $3, $4) @@ positions_to_region $symbolstartpos $endpos }
   | LPAR ASSERT_TRAP script_module STRING RPAR
-    { AssertUninstantiable (snd $3, $4) @@ at () }
-  | LPAR ASSERT_RETURN action result_list RPAR { AssertReturn ($3, $4) @@ at () }
-  | LPAR ASSERT_TRAP action STRING RPAR { AssertTrap ($3, $4) @@ at () }
-  | LPAR ASSERT_EXHAUSTION action STRING RPAR { AssertExhaustion ($3, $4) @@ at () }
+    { AssertUninstantiable (snd $3, $4) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR ASSERT_RETURN action result_list RPAR { AssertReturn ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR ASSERT_TRAP action STRING RPAR { AssertTrap ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR ASSERT_EXHAUSTION action STRING RPAR { AssertExhaustion ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
 
 cmd :
-  | action { Action $1 @@ at () }
-  | assertion { Assertion $1 @@ at () }
-  | script_module { Module (fst $1, snd $1) @@ at () }
-  | LPAR REGISTER name module_var_opt RPAR { Register ($3, $4) @@ at () }
-  | meta { Meta $1 @@ at () }
+  | action { Action $1 @@ positions_to_region $symbolstartpos $endpos }
+  | assertion { Assertion $1 @@ positions_to_region $symbolstartpos $endpos }
+  | script_module { Module (fst $1, snd $1) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR REGISTER name module_var_opt RPAR { Register ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
+  | meta { Meta $1 @@ positions_to_region $symbolstartpos $endpos }
 
 cmd_list :
   | /* empty */ { [] }
   | cmd cmd_list { $1 :: $2 }
 
 meta :
-  | LPAR SCRIPT script_var_opt cmd_list RPAR { Script ($3, $4) @@ at () }
-  | LPAR INPUT script_var_opt STRING RPAR { Input ($3, $4) @@ at () }
-  | LPAR OUTPUT script_var_opt STRING RPAR { Output ($3, Some $4) @@ at () }
-  | LPAR OUTPUT script_var_opt RPAR { Output ($3, None) @@ at () }
+  | LPAR SCRIPT script_var_opt cmd_list RPAR { Script ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR INPUT script_var_opt STRING RPAR { Input ($3, $4) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR OUTPUT script_var_opt STRING RPAR { Output ($3, Some $4) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR OUTPUT script_var_opt RPAR { Output ($3, None) @@ positions_to_region $symbolstartpos $endpos }
 
 const :
-  | LPAR CONST num RPAR { Values.Num (snd (num $2 $3)) @@ at () }
-  | LPAR REF_NULL ref_kind RPAR { Values.Ref (Values.NullRef $3) @@ at () }
-  | LPAR REF_EXTERN NAT RPAR { Values.Ref (ExternRef (nat32 $3 (ati 3))) @@ at () }
+  | LPAR CONST num RPAR { Values.Num (snd (num $2 $3)) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR REF_NULL ref_kind RPAR { Values.Ref (Values.NullRef $3) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR REF_EXTERN NAT RPAR { Values.Ref (ExternRef (nat32 $3 (positions_to_region ($startpos($3)) ($endpos($3))))) @@ positions_to_region $symbolstartpos $endpos }
 
 const_list :
   | /* empty */ { [] }
   | const const_list { $1 :: $2 }
 
 result :
-  | const { LitResult $1 @@ at () }
-  | LPAR CONST NAN RPAR { NanResult (nanop $2 ($3 @@ ati 3)) @@ at () }
-  | LPAR REF_FUNC RPAR { RefResult FuncRefType @@ at () }
-  | LPAR REF_EXTERN RPAR { RefResult ExternRefType @@ at () }
+  | const { LitResult $1 @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR CONST NAN RPAR { NanResult (nanop $2 ($3 @@ positions_to_region ($startpos($3)) ($endpos($3)))) @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR REF_FUNC RPAR { RefResult FuncRefType @@ positions_to_region $symbolstartpos $endpos }
+  | LPAR REF_EXTERN RPAR { RefResult ExternRefType @@ positions_to_region $symbolstartpos $endpos }
 
 result_list :
   | /* empty */ { [] }
@@ -1067,7 +1063,7 @@ result_list :
 
 script :
   | cmd_list EOF { $1 }
-  | inline_module1 EOF { [Module (None, $1) @@ at ()] }  /* Sugar */
+  | inline_module1 EOF { [Module (None, $1) @@ positions_to_region $symbolstartpos $endpos] }  /* Sugar */
 
 script1 :
   | cmd { [$1] }

@@ -18,3 +18,4 @@
 ;   (uri (< 2.0.0))
 ;   (fieldslib (> v0.12))
 ;   (fieldslib (< v0.13))))
+(using menhir 2.1)
