@@ -692,7 +692,7 @@ func_body :
       {ftype = -1l @@ positions_to_region $symbolstartpos $endpos; locals = []; body = $1 c'} }
   | LPAR LOCAL value_type_list RPAR func_body
     { fun c -> anon_locals c (lazy $3); let f = $5 c in
-      {f with locals = $3 @ f.locals} }
+      {f with Ast.locals = $3 @ f.Ast.locals} }
   | LPAR LOCAL bind_var value_type RPAR func_body  /* Sugar */
     { fun c -> ignore (bind_local c $3); let f = $6 c in
       {f with locals = $4 :: f.locals} }
@@ -982,7 +982,7 @@ module_var_opt :
   | /* empty */ { None }
   | VAR { Some ($1 @@ positions_to_region $symbolstartpos $endpos) }  /* Sugar */
 
-module_ :
+%public module_ :
   | LPAR MODULE module_var_opt module_fields RPAR
     { $3, Textual ($4 (empty_context ()) () @@ positions_to_region $symbolstartpos $endpos) @@ positions_to_region $symbolstartpos $endpos }
 
@@ -995,7 +995,7 @@ inline_module1 :  /* Sugar */
 
 /* Scripts */
 
-script_var_opt :
+%public script_var_opt :
   | /* empty */ { None }
   | VAR { Some ($1 @@ positions_to_region $symbolstartpos $endpos) }  /* Sugar */
 

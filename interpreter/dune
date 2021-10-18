@@ -16,3 +16,16 @@
 (rule
  (alias  runtest)
  (action (run ../test/core/run.py --wasm `pwd`/_build/default/main.exe)))
+
+
+(install
+ (files text/parser.mly)
+ (section lib))
+
+(install
+ (files text/lexer.mll)
+ (section lib))
+
+(install
+ (files (main.exe as wasm))
+ (section bin))
