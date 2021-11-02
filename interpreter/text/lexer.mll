@@ -384,6 +384,9 @@ rule token = parse
   | "input" { INPUT }
   | "output" { OUTPUT }
 
+  | "instance" { INSTANCE }
+  | "instantiate" { INSTANTIATE }
+
   | name as s { VAR s }
 
   | ";;"utf8_no_nl*eof { EOF }

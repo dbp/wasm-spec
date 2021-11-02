@@ -10,8 +10,8 @@
 (library
  (name wasm)
  (public_name wasm)
- (wrapped (transition "This should be fixed!"))
- (modules decode encode utf8 eval eval_numeric f32 f32_convert f64 f64_convert flags float i32 i32_convert i64 i64_convert int lexer numeric_error env spectest func global instance memory table import js run script ast free operators types values arrange parse parser print error lib sexpr source valid))
+ (wrapped true)
+ (modules decode encode utf8 eval eval_numeric f32 f32_convert f64 f64_convert flags float i32 i32_convert i64 i64_convert int lexer numeric_error env spectest func global instance memory table import js run script ast free operators types values arrange parse parser parserprelude print error lib sexpr source valid))
 
 (rule
  (alias  runtest)

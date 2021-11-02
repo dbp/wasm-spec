@@ -191,6 +191,8 @@ let inline_type_explicit (c : context) x ft at =
 %token INPUT OUTPUT
 %token EOF
 
+%token INSTANCE INSTANTIATE
+
 %token<string> NAT
 %token<string> INT
 %token<string> FLOAT
@@ -879,7 +881,7 @@ import_desc :
     { fun c -> ignore ($3 c anon_global bind_global);
       fun () -> GlobalImport $4 }
 
-import :
+%public import :
   | LPAR IMPORT name name import_desc RPAR
     { let at = positions_to_region $symbolstartpos $endpos and at5 = positions_to_region ($startpos($5)) ($endpos($5)) in
       fun c -> let df = $5 c in
@@ -894,7 +896,7 @@ export_desc :
   | LPAR MEMORY var RPAR { fun c -> MemoryExport ($3 c memory) }
   | LPAR GLOBAL var RPAR { fun c -> GlobalExport ($3 c global) }
 
-export :
+%public export :
   | LPAR EXPORT name export_desc RPAR
     { let at = positions_to_region $symbolstartpos $endpos and at4 = positions_to_region ($startpos($4)) ($endpos($4)) in
       fun c -> {name = $3; edesc = $4 c @@ at4} @@ at }

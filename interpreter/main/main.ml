@@ -2,8 +2,8 @@ let name = "wasm"
 let version = "1.1"
 
 let configure () =
-  Import.register (Utf8.decode "spectest") Spectest.lookup;
-  Import.register (Utf8.decode "env") Env.lookup
+  Wasm.Import.register (Wasm.Utf8.decode "spectest") Wasm.Spectest.lookup;
+  Wasm.Import.register (Wasm.Utf8.decode "env") Wasm.Env.lookup
 
 let banner () =
   print_endline (name ^ " " ^ version ^ " reference interpreter")
@@ -17,20 +17,20 @@ let quote s = "\"" ^ String.escaped s ^ "\""
 
 let argspec = Arg.align
 [
-  "-", Arg.Set Flags.interactive,
+  "-", Arg.Set Wasm.Flags.interactive,
     " run interactively (default if no files given)";
   "-e", Arg.String add_arg, " evaluate string";
   "-i", Arg.String (fun file -> add_arg ("(input " ^ quote file ^ ")")),
     " read script from file";
   "-o", Arg.String (fun file -> add_arg ("(output " ^ quote file ^ ")")),
     " write module to file";
-  "-w", Arg.Int (fun n -> Flags.width := n),
+  "-w", Arg.Int (fun n -> Wasm.Flags.width := n),
     " configure output width (default is 80)";
-  "-s", Arg.Set Flags.print_sig, " show module signatures";
-  "-u", Arg.Set Flags.unchecked, " unchecked, do not perform validation";
-  "-h", Arg.Clear Flags.harness, " exclude harness for JS conversion";
-  "-d", Arg.Set Flags.dry, " dry, do not run program";
-  "-t", Arg.Set Flags.trace, " trace execution";
+  "-s", Arg.Set Wasm.Flags.print_sig, " show module signatures";
+  "-u", Arg.Set Wasm.Flags.unchecked, " unchecked, do not perform validation";
+  "-h", Arg.Clear Wasm.Flags.harness, " exclude harness for JS conversion";
+  "-d", Arg.Set Wasm.Flags.dry, " dry, do not run program";
+  "-t", Arg.Set Wasm.Flags.trace, " trace execution";
   "-v", Arg.Unit banner, " show version"
 ]
 
@@ -40,12 +40,12 @@ let () =
     configure ();
     Arg.parse argspec
       (fun file -> add_arg ("(input " ^ quote file ^ ")")) usage;
-    List.iter (fun arg -> if not (Run.run_string arg) then exit 1) !args;
-    if !args = [] then Flags.interactive := true;
-    if !Flags.interactive then begin
-      Flags.print_sig := true;
+    List.iter (fun arg -> if not (Wasm.Run.run_string arg) then exit 1) !args;
+    if !args = [] then Wasm.Flags.interactive := true;
+    if !Wasm.Flags.interactive then begin
+      Wasm.Flags.print_sig := true;
       banner ();
-      Run.run_stdin ()
+      Wasm.Run.run_stdin ()
     end
   with exn ->
     flush_all ();
